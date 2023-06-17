@@ -1,0 +1,75 @@
+
+from selenium.webdriver.common.by import By
+from selenium.webdriver import ChromeOptions
+from selenium import webdriver		# 导入selenium，用于实现网页的爬取
+import csv				# 导入csv模块，用于保存文件
+option = ChromeOptions()
+option.add_experimental_option('excludeSwitches', ['enable-automation'])
+option.add_experimental_option("detach", True)
+# 接下来都是反爬措施
+option.add_experimental_option("excludeSwitches", ['enable-automation'])
+option.add_experimental_option("useAutomationExtension", False)
+# 初始化一个浏览器对象
+
+class Univercity(object):			# 定义一个类方法
+    def __init__(self):				# 重写__init__
+        self.driver = webdriver.Chrome()	# 加载谷歌驱动
+        self.driver.maximize_window()		# 浏览器窗口最大化处理
+        # 定义csv文件的列名
+        self.header = ['Rank','Cn','En','Rate','Location','Type']
+        # 用于接收爬取到的数据
+        self.data = []
+        # 后期代码基本实现后，把浏览器设置成无头模式，也就是不打开浏览器
+        options = webdriver.ChromeOptions()     # 创建chrome的设置对象
+        options.add_argument('--headless')      # 设置成无界面，也就是不打开浏览器
+        self.driver = webdriver.Chrome(options=options)
+
+	# 解析网页页面函数
+    def parse_html(self,url):
+        self.driver.get(url)					# 从类的入口函数接收目标url，也就是下面的self.main()函数
+        self.driver.implicitly_wait(1)			# 隐式等待
+
+        while True:								# 当未到达最后一页，一直执行
+        	# 先获取每一页的所有tr标签
+            tr_list = self.driver.find_elements_by_xpath('.//*[@id="content-box"]/div[2]/table/tbody/tr')
+            # 从每一个 tr 标签中分别获取到详细信息
+            for tr in tr_list:
+                items = {}		# 定义一个空字典，存储每一个大学的详细信息
+                # 通过xpath方式获取大学排名 .//表示在当前的xpath路径下寻找
+                items['Rank'] = tr.find_element_by_xpath('.//td/div').text
+                # 通过寻找属性名的方式，获取大学的中文名
+                items['Cn'] = tr.find_element_by_class_name('name-cn').text
+                # 通过寻找属性名的方式，获取大学的英文名
+                items['En'] = tr.find_element_by_class_name('name-en').text
+                # 这里获取大学是否为985/211的时候，就得做一些异常处理，因为到后面很多高校是非985/211的，就是说标签里面是空的，如果为空，将其定义为空字符
+                try:
+                    items['Rate'] = tr.find_element_by_class_name('tags').text
+                except:
+                    items['Rate'] = ""
+                # 通过xpath获取大学的地点
+                items['Location'] = tr.find_element_by_xpath('.//td[3]').text
+                # 通过xpath获取大学的类型，综合、理工、师范等
+                items['Type'] = tr.find_element_by_xpath('.//td[4]').text
+
+                # 将一个大学的数据添加到列表中
+                self.data.append(items)
+			# 翻页处理，page_source.find()返回的是一个布尔值，如果在每一页中没找到标签属性为 nt-pagination-disabled ant-pagination-next 的元素则会返回 -1，到了最后一页的时候则为真，跳出循环
+            if self.driver.page_source.find('ant-pagination-disabled ant-pagination-next') == -1:
+                self.driver.find_element_by_class_name('ant-pagination-next').click()
+                self.driver.implicitly_wait(2)
+            else:
+                break
+
+	# 数据保存操作
+
+
+	# 函数入口
+    def main(self):
+        url = 'https://www.shanghairanking.cn/rankings/bcur/202111'
+        self.parse_html(url)		# 调用解析函数
+        self.save_data(self.header,self.data)		# 调用保存数据函数
+
+
+if __name__ == '__main__':
+    u = Univercity()		# 实例化一个对象
+    u.main()			
